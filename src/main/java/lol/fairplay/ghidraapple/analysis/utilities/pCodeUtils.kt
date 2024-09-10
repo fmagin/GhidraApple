@@ -98,3 +98,13 @@ fun getClassSymbolFromCodeSymbol(symbol: Symbol): ClassSymbol? {
     val clsSymbol = symbol.program.symbolTable.getSymbols(className).filterIsInstance<ClassSymbol>().singleOrNull()
     return clsSymbol
 }
+
+fun getFunctionForPCodeCall(program: Program, pcodeOp: PcodeOp?): Optional<Function> {
+    if (pcodeOp != null && pcodeOp.opcode == PcodeOp.CALL) {
+        val target = pcodeOp.inputs.getOrNull(0) ?: return Optional.empty()
+        if (target.isAddress) {
+            return Optional.of(program.functionManager.getFunctionAt(target.address))
+        }
+    }
+    return Optional.empty()
+}
