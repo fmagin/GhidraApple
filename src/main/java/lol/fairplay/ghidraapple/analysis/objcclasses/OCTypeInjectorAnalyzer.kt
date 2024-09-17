@@ -25,6 +25,7 @@ import ghidra.program.model.symbol.Symbol
 import ghidra.util.Msg
 import ghidra.util.task.TaskMonitor
 import lol.fairplay.ghidraapple.analysis.utilities.getConstantFromVarNode
+import lol.fairplay.ghidraapple.analysis.utilities.getDataTypeFromSymbol
 import kotlin.jvm.optionals.getOrNull
 
 
@@ -145,7 +146,7 @@ class OCTypeInjectorAnalyzer : AbstractAnalyzer(NAME, DESCRIPTION, AnalyzerType.
                 }
                 val allocatedSymbol = objectLookUp[const.offset]
                 if (allocatedSymbol != null){
-                    val ocType = getDataTypeFromSymbol(allocatedSymbol!!)
+                    val ocType = getDataTypeFromSymbol(allocatedSymbol)
                     result.add(AllocInfo(function, allocCall.seqnum.target, generateFunctionSignatureForType(ocType)))
                 }
                 else {
@@ -167,17 +168,6 @@ class OCTypeInjectorAnalyzer : AbstractAnalyzer(NAME, DESCRIPTION, AnalyzerType.
         fsig.arguments = arrayOf(ParameterDefinitionImpl("cls", type, null))
         return fsig
     }
-
-    /**
-     * Takes a symbol like `_OBJC_CLASS_$_CLCircularRegion` and returns the DataType for that class.
-     */
-    private fun getDataTypeFromSymbol(symbol: Symbol): DataType {
-
-        val className = symbol.name.removePrefix("_OBJC_CLASS_\$_")
-        val type = program.dataTypeManager.getDataType("/GA_OBJC/$className")
-        return type
-    }
-
 
     private fun allocFnSymbols(): List<FunctionSymbol> {
         val result = mutableListOf<FunctionSymbol>()

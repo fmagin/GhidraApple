@@ -1,9 +1,15 @@
 package lol.fairplay.ghidraapple.analysis.utilities
 
+import ghidra.program.database.symbol.ClassSymbol
 import ghidra.program.model.address.Address
+import ghidra.program.model.data.DataType
+import ghidra.program.model.listing.Function
+import ghidra.program.model.listing.Program
 import ghidra.program.model.pcode.PcodeOp
 import ghidra.program.model.pcode.Varnode
-import ghidra.program.model.listing.Program
+import ghidra.program.model.symbol.ReferenceManager
+import ghidra.program.model.symbol.SourceType
+import ghidra.program.model.symbol.Symbol
 import ghidra.util.Msg
 import java.util.*
 
@@ -30,6 +36,7 @@ fun getConstantFromPcodeOp(pcodeOp: PcodeOp): Optional<Address> {
         // Multiequal is a phi node, so we can't get _one_ constant from it
         PcodeOp.MULTIEQUAL -> return Optional.empty<Address>()
         PcodeOp.INDIRECT -> return getConstantFromVarNode(pcodeOp.inputs[0])
+        PcodeOp.CALL -> return Optional.empty()
         else -> {
             Msg.error("getConstantFromPcodeOp",
                 "Unknown opcode ${pcodeOp.mnemonic} encountered at ${pcodeOp.seqnum.target}")
@@ -51,3 +58,43 @@ fun Address.toDefaultAddressSpace(program: Program): Address {
     return program.addressFactory.defaultAddressSpace.getAddress(this.offset)
 }
 
+fun Function.hasTag(tag: String): Boolean {
+    return this.tags.any { it.name == tag }
+}
+
+fun ReferenceManager.setCallTarget(callsite: Address, targetFunction: Function, sourceType: SourceType) {
+    val ref = addMemoryReference(
+        callsite,
+        targetFunction.entryPoint,
+        ghidra.program.model.symbol.RefType.UNCONDITIONAL_CALL,
+        sourceType, 0)
+    setPrimary(ref, true)
+}
+
+
+/**
+ * Takes a symbol like `_OBJC_CLASS_$_CLCircularRegion` and returns the DataType for that class.
+ */
+fun getDataTypeFromSymbol(symbol: Symbol): DataType {
+    val className = symbol.name.removePrefix("_OBJC_CLASS_\$_")
+    val type = symbol.program.dataTypeManager.getDataType("/GA_OBJC/$className")
+    return type
+}
+
+fun getDataTypeFromClassSymbol(symbol: ClassSymbol): DataType {
+    val className = symbol.name.removePrefix("_OBJC_CLASS_\$_")
+    val type = symbol.program.dataTypeManager.getDataType("/GA_OBJC/$className")
+    return type
+}
+
+fun getClassSymbolForAddress(program: Program, address: Address): ClassSymbol? {
+    val symbol = program.symbolTable.getSymbols(address).filter {  it.name.startsWith("_OBJC_CLASS_\$")}.single()
+    return getClassSymbolFromCodeSymbol(symbol)
+}
+
+fun getClassSymbolFromCodeSymbol(symbol: Symbol): ClassSymbol? {
+    val className = symbol.name.removePrefix("_OBJC_CLASS_\$_")
+
+    val clsSymbol = symbol.program.symbolTable.getSymbols(className).filterIsInstance<ClassSymbol>().singleOrNull()
+    return clsSymbol
+}
