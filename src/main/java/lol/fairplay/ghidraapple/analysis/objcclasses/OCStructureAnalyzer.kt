@@ -7,13 +7,14 @@ import ghidra.app.util.importer.MessageLog
 import ghidra.program.model.address.AddressSetView
 import ghidra.program.model.data.*
 import ghidra.program.model.listing.Program
+import ghidra.program.model.symbol.SourceType
 import ghidra.util.task.TaskMonitor
 
 
 class OCStructureAnalyzer : AbstractAnalyzer(NAME, DESCRIPTION, AnalyzerType.BYTE_ANALYZER) {
 
     companion object {
-        private const val NAME = "Objective-C Structures"
+        const val NAME = "Objective-C Structures"
         private const val DESCRIPTION = ""
         private val PRIORITY = AnalysisPriority.BLOCK_ANALYSIS.after()
     }
@@ -34,7 +35,9 @@ class OCStructureAnalyzer : AbstractAnalyzer(NAME, DESCRIPTION, AnalyzerType.BYT
 
             // keep this in, because some of them do have the prefix.
             val className = it.name.removePrefix("_OBJC_CLASS_\$_")
-
+            if (it.isExternal){
+                program.symbolTable.createClass(program.globalNamespace, className, SourceType.ANALYSIS)
+            }
             // Create a struct for the class following the naming scheme: `struct_<CLASSNAME>`
             val classStruct = StructureDataType(category, "struct_$className", 0)
             program.dataTypeManager.addDataType(classStruct, null)
