@@ -1,22 +1,14 @@
 package lol.fairplay.ghidraapple;
 
 import docking.action.builder.ActionBuilder;
-import ghidra.app.decompiler.ClangVariableToken;
-import ghidra.app.decompiler.DecompilerLocation;
 import ghidra.app.plugin.PluginCategoryNames;
 import ghidra.app.plugin.ProgramPlugin;
-import ghidra.app.plugin.core.decompile.DecompilerActionContext;
 import ghidra.app.plugin.core.decompile.actions.ChooseMsgSendCalleeAction;
 import ghidra.framework.plugintool.PluginInfo;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.framework.plugintool.util.PluginStatus;
-import ghidra.program.model.listing.FunctionTag;
-import ghidra.program.model.pcode.HighConstant;
-import ghidra.program.model.pcode.PcodeOp;
-import lol.fairplay.ghidraapple.actions.ChooseMsgSendCalleeDialog;
+import lol.fairplay.ghidraapple.comands.InlineTrivialAccessors;
 
-import static lol.fairplay.ghidraapple.analysis.PCodeUtilsKt.getFunctionForPCodeCall;
-import static lol.fairplay.ghidraapple.analysis.selectortrampoline.SelectorTrampolineAnalyzer.TRAMPOLINE_TAG;
 
 
 //@formatter:off
@@ -36,6 +28,22 @@ public class GhidraApplePlugin extends ProgramPlugin {
 
     private void setupActions() {
         tool.addAction(new ChooseMsgSendCalleeAction());
+        new ActionBuilder("Inline all trivial accessors", "GhidraApple")
+                .description("Inline all trivial accessors")
+                .enabled(true)
+                .menuPath("Objective-C", "Inline all trivial accessors")
+                .onAction(e -> {
+                    new InlineTrivialAccessors(true).applyTo(currentProgram);
+                })
+                .buildAndInstall(tool);
+        new ActionBuilder("Outline all trivial accessors", "GhidraApple")
+                .description("Inline all trivial accessors")
+                .enabled(true)
+                .menuPath("Objective-C", "Outline all trivial accessors")
+                .onAction(e -> {
+                    new InlineTrivialAccessors(false).applyTo(currentProgram);
+                })
+                .buildAndInstall(tool);
     }
 
 }
