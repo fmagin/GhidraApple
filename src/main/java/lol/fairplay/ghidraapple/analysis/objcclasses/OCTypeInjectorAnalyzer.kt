@@ -39,7 +39,7 @@ class OCTypeInjectorAnalyzer : AbstractAnalyzer(NAME, DESCRIPTION, AnalyzerType.
         private const val NAME = "Objective-C Type Injection"
         private const val DESCRIPTION = ""
         // This has to run before the data type propagation (but not earlier), otherwise not all alloc calls are found?
-        private val PRIORITY = AnalysisPriority.DATA_TYPE_PROPOGATION.before()
+        val PRIORITY: AnalysisPriority = AnalysisPriority.DATA_TYPE_PROPOGATION.before().before()
     }
 
     init {

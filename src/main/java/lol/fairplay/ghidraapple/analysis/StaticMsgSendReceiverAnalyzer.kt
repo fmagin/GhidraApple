@@ -1,22 +1,13 @@
 package lol.fairplay.ghidraapple.analysis
 
-import ghidra.app.decompiler.DecompInterface
-import ghidra.app.decompiler.DecompileOptions
-import ghidra.app.services.AbstractAnalyzer
 import ghidra.app.services.AnalysisPriority
 import ghidra.app.services.AnalyzerType
 import ghidra.app.util.importer.MessageLog
-import ghidra.framework.options.Options
-import ghidra.program.database.symbol.ClassSymbol
-import ghidra.program.model.address.Address
 import ghidra.program.model.address.AddressSetView
-import ghidra.program.model.data.DataType
-import ghidra.program.model.listing.Function
 import ghidra.program.model.listing.ParameterImpl
 import ghidra.program.model.listing.Program
 import ghidra.program.model.pcode.HighFunction
 import ghidra.program.model.pcode.PcodeOp
-import ghidra.program.model.pcode.Varnode
 import ghidra.program.model.symbol.SourceType
 import ghidra.util.Msg
 import ghidra.util.task.TaskMonitor
@@ -27,19 +18,7 @@ import kotlin.jvm.optionals.getOrNull
 
 
 
-typealias Selector = String
 
-
-data class StaticCallInfo(
-    val callsite: Address,
-    val receiver: ClassSymbol?,
-    val selector: Selector?,
-    val implementation: Function?
-    ) {
-    fun applyToProgram(program: Program) {
-        program.referenceManager.setCallTarget(callsite, implementation!!, SourceType.ANALYSIS)
-    }
-}
 
 /**
  * This analyzer handles all static calls, i.e. msgSend or stub calls where the receiver is a static class
@@ -47,7 +26,7 @@ data class StaticCallInfo(
  * For internal classes these implementations should be part of the binary
  * TODO: For external classes it will create a new function in the external segment, and link to that
  */
-class StaticMsgSendReceiverAnalyzer: AbstractDynamicDispatchAnalyzer<StaticCallInfo>(
+class StaticMsgSendReceiverAnalyzer: AbstractDynamicDispatchAnalyzer<MsgSendCallInfo>(
     NAME,
     "Checks all msgSend calls for a static receiver and links to the target implementation",
     AnalyzerType.FUNCTION_ANALYZER) {
@@ -67,18 +46,7 @@ class StaticMsgSendReceiverAnalyzer: AbstractDynamicDispatchAnalyzer<StaticCallI
 
     override fun added(program: Program, set: AddressSetView, monitor: TaskMonitor, log: MessageLog): Boolean {
         // Get the msgSend function and make sure that it has a correct signature set up
-        program.withTransaction<Exception>("Setup msgSend signatures"){
-            getDynamicDispatchFunctions(program).forEach {
-                val id = program.dataTypeManager.getDataType("/_objc2_/ID")
-                if (it.signature.arguments.isEmpty()) {
-                    it.addParameter(ParameterImpl("recv", id, program), SourceType.IMPORTED)
-                    it.addParameter(ParameterImpl("sel", id, program), SourceType.IMPORTED)
-                    it.setReturnType(id, SourceType.IMPORTED)
-                    it.setVarArgs(true)
-
-                }
-            }
-        }
+        setupMsgSendSignature(program)
 
         val results = doDispatchAnalysis(program, set, monitor, log)
         results.mapNotNull { it.getOrNull() }.forEach {
@@ -90,7 +58,7 @@ class StaticMsgSendReceiverAnalyzer: AbstractDynamicDispatchAnalyzer<StaticCallI
         return true
     }
 
-    override fun processDispatchSite(highFunction: HighFunction, pcodeOp: PcodeOp): Result<StaticCallInfo> {
+    override fun processDispatchSite(highFunction: HighFunction, pcodeOp: PcodeOp): Result<MsgSendCallInfo> {
         // Check if we have a constant receiver
         val receiver = getConstantFromVarNode(pcodeOp.inputs[1]).getOrNull().let {
             it?.toDefaultAddressSpace(highFunction.function.program)
@@ -108,7 +76,7 @@ class StaticMsgSendReceiverAnalyzer: AbstractDynamicDispatchAnalyzer<StaticCallI
             }
 
 
-            return Result.success(StaticCallInfo(pcodeOp.seqnum.target, receiver, selector, implementation))
+            return Result.success(MsgSendCallInfo(pcodeOp.seqnum.target, receiver, selector, implementation))
         }
         return Result.failure(Exception("No static receiver found"))
     }

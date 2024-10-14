@@ -11,18 +11,35 @@ import ghidra.program.model.address.Address
 import ghidra.program.model.address.AddressSetView
 import ghidra.program.model.listing.Function
 import ghidra.program.model.listing.GhidraClass
+import ghidra.program.model.listing.ParameterImpl
 import ghidra.program.model.listing.Program
 import ghidra.program.model.pcode.HighFunction
 import ghidra.program.model.pcode.PcodeOp
 import ghidra.program.model.pcode.Varnode
+import ghidra.program.model.symbol.SourceType
 import ghidra.util.Msg
 import ghidra.util.task.TaskMonitor
 import lol.fairplay.ghidraapple.analysis.selectortrampoline.SelectorTrampolineAnalyzer
 import lol.fairplay.ghidraapple.analysis.utilities.hasTag
 import lol.fairplay.ghidraapple.analysis.utilities.setCallTarget
 
-abstract class AbstractDynamicDispatchAnalyzer<T>(name: String, s: String, analyzerType: AnalyzerType):
-    AbstractAnalyzer(name, s, analyzerType) {
+typealias Selector = String
+
+
+data class MsgSendCallInfo(
+    val callsite: Address,
+    val receiver: ClassSymbol?,
+    val selector: Selector?,
+    val implementation: Function?
+) {
+    fun applyToProgram(program: Program) {
+        program.referenceManager.setCallTarget(callsite, implementation!!, SourceType.ANALYSIS)
+    }
+}
+
+
+abstract class AbstractDynamicDispatchAnalyzer<T>(name: String, description: String, analyzerType: AnalyzerType):
+    AbstractAnalyzer(name, description, analyzerType) {
     /**
      * Collect all FunctionSymbols for functions that are effectively dynamic dispatch callsites.
      * This includes: msgSend and all trampoline functions
@@ -55,6 +72,21 @@ abstract class AbstractDynamicDispatchAnalyzer<T>(name: String, s: String, analy
         return super.canAnalyze(program)
     }
 
+
+    protected fun setupMsgSendSignature(program: Program) {
+        program.withTransaction<Exception>("Setup msgSend signatures"){
+            getDynamicDispatchFunctions(program).forEach {
+                val id = program.dataTypeManager.getDataType("/_objc2_/ID")
+                if (it.signature.arguments.isEmpty()) {
+                    it.addParameter(ParameterImpl("recv", id, program), SourceType.IMPORTED)
+                    it.addParameter(ParameterImpl("sel", id, program), SourceType.IMPORTED)
+                    it.setReturnType(id, SourceType.IMPORTED)
+                    it.setVarArgs(true)
+
+                }
+            }
+        }
+    }
 
     open fun createDecompiler(program: Program): DecompInterface{
         val decompiler = DecompInterface()
