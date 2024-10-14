@@ -41,4 +41,12 @@ dependencies {
 kotlin {
     jvmToolchain(17)
 }
+
+sourceSets {
+    main {
+        kotlin {
+            srcDirs 'ghidra_scripts'
+        }
+    }
+}
 //----------------------END "DO NOT MODIFY" SECTION-------------------------------
