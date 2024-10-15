@@ -10,6 +10,7 @@ import ghidra.program.model.pcode.Varnode
 import ghidra.program.model.symbol.ReferenceManager
 import ghidra.program.model.symbol.SourceType
 import ghidra.program.model.symbol.Symbol
+import ghidra.program.model.symbol.SymbolTable
 import ghidra.util.Msg
 import java.util.*
 
@@ -87,16 +88,30 @@ fun getDataTypeFromClassSymbol(symbol: ClassSymbol): DataType {
     return type
 }
 
+/**
+ * Gets the class at a certain address
+ * This is somewhat tricky because Ghidra seems to be inconsistent about the generated symbols between binaries:
+ * Sometimes there are two symbols for the same class:
+ * - one with the name `_OBJC_CLASS_$_ClassName
+ * - one with the name `ClassName` that is in the namespace `objc::class_t`
+ *
+ * Sometimes we only have the first, sometimes only the second, sometimes both.
+ */
 fun getClassSymbolForAddress(program: Program, address: Address): ClassSymbol? {
-    val symbol = program.symbolTable.getSymbols(address).filter {  it.name.startsWith("_OBJC_CLASS_\$")}.single()
-    return getClassSymbolFromCodeSymbol(symbol)
+    val symbol = program.symbolTable.getSymbols(address)
+        .filter {  it.name.startsWith("_OBJC_CLASS_\$") || it.parentNamespace.name == "class_t"}
+        .firstOrNull()
+    return symbol?.let { getClassSymbolFromCodeSymbol(it) }
 }
 
 fun getClassSymbolFromCodeSymbol(symbol: Symbol): ClassSymbol? {
     val className = symbol.name.removePrefix("_OBJC_CLASS_\$_")
+    return getClassSymbolByName(symbol.program.symbolTable, className)
+}
 
-    val clsSymbol = symbol.program.symbolTable.getSymbols(className).filterIsInstance<ClassSymbol>().singleOrNull()
-    return clsSymbol
+fun getClassSymbolByName(symbolTable: SymbolTable, name: String): ClassSymbol? {
+    val symbol = symbolTable.getSymbols(name).filterIsInstance<ClassSymbol>().singleOrNull()
+    return symbol
 }
 
 fun getFunctionForPCodeCall(program: Program, pcodeOp: PcodeOp?): Optional<Function> {
